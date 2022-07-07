@@ -3,8 +3,12 @@ from singleton import singleton
 
 @singleton
 class ConversationSessions:
-    def __init__(self):
+    def __init__(self, max_history_size=2):
         self.sessions: dict[str, UserAndBotConversation] = {}
+        self.max_history_size = max_history_size
+
+    def reset(self):
+        self.sessions = {}
 
     def add_session_message(self, username, user_message=None, bot_message=None):
         session = self.get_or_create_session(username)
@@ -29,7 +33,7 @@ class ConversationSessions:
         return self.sessions.get(username)
 
     def create_session(self, username):
-        self.sessions[username] = UserAndBotConversation()
+        self.sessions[username] = UserAndBotConversation(self.max_history_size)
         return self.sessions[username]
 
     def get_or_create_session(self, username):
@@ -40,7 +44,7 @@ class ConversationSessions:
 
 
 class UserAndBotConversation:
-    def __init__(self, history_size=10):
+    def __init__(self, history_size=2):
         self.user_session = MessageHistory(history_size)
         self.bot_session = MessageHistory(history_size)
         self.stack = ConversationHistory(history_size * 2)
@@ -61,7 +65,7 @@ class UserAndBotConversation:
 
 
 class ConversationHistory:
-    def __init__(self, max_size=20):
+    def __init__(self, max_size=4):
         self.history = []
         self.max_size = max_size
 
@@ -78,14 +82,17 @@ class ConversationHistory:
 
 
 class MessageHistory:
-    def __init__(self, max_size=10):
+    def __init__(self, max_size=2):
         self.history = []
         self.max_size = max_size
 
     def push(self, message):
         if len(self.history) == self.max_size:
-            self.history.pop(0)
+            self.flush()
         self.history.append(message)
 
+    def flush(self):
+        self.history = []
+
     def get(self, message_index):
-        return self.history[message_index] if len(self.history) > abs(message_index) else None
+        return self.history[message_index] if len(self.history) >= abs(message_index) else None

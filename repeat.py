@@ -2,13 +2,14 @@ from answer import AnswerFinder, AnswersLoader
 from session import ConversationSessions
 
 
-class ChatBot:
-    def __init__(self, question, for_username):
+class RepeatAndMemoizeBot:
+    def __init__(self, question, for_username, can_answer_and_response_be_identical=False):
         self.question = question
         self.sessions = ConversationSessions()
         self.username = for_username
         self.answer_finder = AnswerFinder(question)
         self.answers_loader = AnswersLoader()
+        self.can_answer_and_response_be_identical = can_answer_and_response_be_identical
 
     def should_repeat(self):
         return self.answer_finder.find_answer() is None
@@ -20,7 +21,7 @@ class ChatBot:
         if self.should_repeat():
             return self.repeat()
         else:
-            return self.answer_memoized()
+            return self.memoized_answer()
 
     def repeat(self):
         return self.question
@@ -34,10 +35,18 @@ class ChatBot:
         return self.sessions.get_user_message(self.username, -2)
 
     def save_question_as_answer_to_next_to_last_question(self):
-        self.answers_loader.save_answer(
-            question=self.get_next_to_last_user_message(),
-            answer=self.question
-        )
+        question = self.get_next_to_last_user_message()
+        answer = self.question
+        if question == answer and self.can_answer_and_response_be_identical:
+            self.answers_loader.save_answer(
+                question=question,
+                answer=answer
+            )
+        elif question != answer:
+            self.answers_loader.save_answer(
+                question=question,
+                answer=answer
+            )
 
-    def answer_memoized(self):
+    def memoized_answer(self):
         return self.answer_finder.find_answer()
