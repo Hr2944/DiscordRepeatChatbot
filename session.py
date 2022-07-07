@@ -2,7 +2,7 @@ from singleton import singleton
 
 
 @singleton
-class ConversationSessions:
+class ConversationSessionsRegistry:
     def __init__(self, max_history_size=2):
         self.sessions: dict[str, UserAndBotConversation] = {}
         self.max_history_size = max_history_size

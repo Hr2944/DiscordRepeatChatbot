@@ -1,56 +1,52 @@
-import discord
-
-from question import QuestionSanitizer
-from repeat import RepeatAndMemoizeBot
-from session import ConversationSessions
+from answer import AnswerFinder, AnswersLoader
+from session import ConversationSessionsRegistry
 
 
-class Bot(discord.Client):
-    async def on_ready(self):
-        print('Logged on as {0}!'.format(self.user))
+class RepeatAndMemoizeBot:
+    def __init__(self, question, for_username, can_answer_and_response_be_identical=False):
+        self.question = question
+        self.sessions = ConversationSessionsRegistry()
+        self.username = for_username
+        self.answer_finder = AnswerFinder(question)
+        self.answers_loader = AnswersLoader()
+        self.can_answer_and_response_be_identical = can_answer_and_response_be_identical
 
-    async def on_message(self, message):
-        if self.is_bot_channel(message):
-            if self.should_reset(message):
-                self.reset()
-                await message.channel.send("Done.")
-            else:
-                question_sanitizer = QuestionSanitizer(message.content)
-                if question_sanitizer.is_sanitize_safe():
-                    await message.channel.send(
-                        self.get_answer_for_question(
-                            question=question_sanitizer.sanitize(),
-                            username=f"{message.author.name}#{message.author.discriminator}"
-                        )
-                    )
-                else:
-                    await message.channel.send(
-                        f"Please ask a question by starting your sentence with '{question_sanitizer.question_prefix}'"
-                    )
+    def should_repeat(self):
+        return self.answer_finder.find_answer() is None
 
-    def is_bot_channel(self, message):
-        return message.author != self.user and "bot" in message.channel.name
+    def respond(self):
+        if self.is_answering_after_unknown_answer():
+            self.save_question_as_answer_to_next_to_last_question()
 
-    @staticmethod
-    def get_answer_for_question(question, username):
-        conversations = ConversationSessions()
-        conversations.add_session_message(
-            username=username,
-            user_message=question
-        )
-        chatbot = RepeatAndMemoizeBot(question=question, for_username=username)
-        answer = chatbot.respond()
-        conversations.add_session_message(
-            username=username,
-            bot_message=answer
-        )
-        return answer
+        if self.should_repeat():
+            return self.repeat()
+        else:
+            return self.memoized_answer()
 
-    @staticmethod
-    def should_reset(message):
-        return message.content == "$reset"
+    def repeat(self):
+        return self.question
 
-    @staticmethod
-    def reset():
-        sessions = ConversationSessions()
-        sessions.reset()
+    def is_answering_after_unknown_answer(self):
+        last_bot_message = self.sessions.get_bot_message(self.username, -1)
+        next_to_last_user_message = self.get_next_to_last_user_message()
+        return last_bot_message == next_to_last_user_message and last_bot_message is not None
+
+    def get_next_to_last_user_message(self):
+        return self.sessions.get_user_message(self.username, -2)
+
+    def save_question_as_answer_to_next_to_last_question(self):
+        question = self.get_next_to_last_user_message()
+        answer = self.question
+        if question == answer and self.can_answer_and_response_be_identical:
+            self.answers_loader.save_answer(
+                question=question,
+                answer=answer
+            )
+        elif question != answer:
+            self.answers_loader.save_answer(
+                question=question,
+                answer=answer
+            )
+
+    def memoized_answer(self):
+        return self.answer_finder.find_answer()
