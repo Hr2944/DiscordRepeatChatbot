@@ -79,7 +79,7 @@ class CommandParser:
         self.check_syntax()
         if self.is_parameterized():
             command = self.message.split(self.command_suffix)[0].split(self.command_prefix)[1]
-            argument = self.message.split(self.command_suffix)[1]
+            argument = ' '.join(self.message.split(self.command_suffix)[1:])
         else:
             command = self.message.split(self.command_prefix)[1]
             argument = None
@@ -88,7 +88,7 @@ class CommandParser:
         return command, argument
 
     def clean_message(self, command):
-        cleaned_command = command.strip().lower()
+        cleaned_command = command.strip()
         if not cleaned_command.startswith(self.command_prefix):
             raise CommandSyntaxError(f"Command must start with {self.command_prefix}")
         return cleaned_command
